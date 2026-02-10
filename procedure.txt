@@ -1,0 +1,19 @@
+Make sure you have necessary software requirements and connected to internet
+Go the root directory (/Code) of the project
+
+1. Start the Streamlit App
+
+	terminal code:
+	streamlit run trading_app.py
+
+The app will automatically open in your default browser at http://localhost:8501
+
+If it doesn't open automatically, manually navigate to: http://localhost:8501
+
+2. Navigate to "Stock Prediction" page
+
+	Click "Train Initial Models" button in the sidebar / Train on updated data
+
+Training Process begins wait until done.
+
+3. You can now use the software on trained data. Most of the features are user friendly, just wait for the processing.
