@@ -1,0 +1,728 @@
+\documentclass[conference, letterpaper]{IEEEtran}
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{ragged2e}
+\usepackage{url}
+
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+
+\geometry{
+    letterpaper,
+    top=1.0in,
+    bottom=1.125in,
+    left=0.8125in,
+    right=0.8125in,
+    textwidth=6.875in,
+    textheight=8.875in,
+    columnsep=0.3125in
+}
+
+\titleformat{\section}[block]
+  {\normalfont\scshape\centering}
+  {}
+  {0pt}
+  {}
+
+\renewcommand{\thesubsection}{\Roman{subsection}}
+\titleformat{\subsection}[hang]
+  {\normalfont\itshape}
+  {\thesubsection.}
+  {0.5em}
+  {}
+
+\titlespacing*{\section}{0pt}{12pt}{6pt}
+\titlespacing*{\subsection}{0pt}{9pt}{3pt}
+
+\DeclareCaptionFormat{custom}{\fontsize{10}{12}\selectfont#1#2#3}
+\captionsetup[figure]{
+    format=custom,
+    labelfont={sc},
+    textfont={sc},
+    justification=justified,
+    labelsep=period
+}
+\captionsetup[table]{
+    format=custom,
+    labelfont={sc, bf},
+    textfont={rm},
+    justification=justified,
+    labelsep=period,
+    position=top
+}
+
+\renewenvironment{abstract}{%
+    \centerline{\bfseries\textit{Abstract}}%
+    \bfseries\itshape\noindent\justify%
+}{}
+
+\begin{document}
+\bstctlcite{IEEEexample:BSTcontrol}
+\title{\fontsize{21}{28}\selectfont Coffee Price Forecasting}
+
+\author{
+    \fontsize{10}{12}\selectfont ADARSH S KAMATAGI \\
+    \textit{Indian Institute of Information Technology, Dharwad} \\
+    \textit{23bcs005@iiitdwd.ac.in}
+    \and
+    \fontsize{10}{12}\selectfont BABHALE ROHAN LAXMIKANT \\
+    \textit{Indian Institute of Information Technology, Dharwad} \\
+    \textit{23bcs026@iiitdwd.ac.in}
+}
+
+\maketitle
+
+\begin{abstract}
+Coffee, the second most traded soft commodity, shows high price volatility driven by climate, demand, and market dynamics. Accurate forecasting is essential for informed trading and risk management. This study develops a hybrid decomposition-based LSTM framework for forecasting coffee futures prices. Using historical data from Yahoo Finance, the series was found to be non-stationary with a strong upward trend and multiple long cycles. MSTL decomposition separated the series into trend, three cyclical components (143, 687, 3200 days), and residuals. Each component was modeled separately using Polynomial Regression for trend, Naive–LSTM ensembles for short and medium cycles, and deep LSTMs for long cycles and residuals. The recombined forecast achieved RMSE = 10.54, MAE = 7.90, and MAPE = 2.89\%, effectively capturing both trend and fluctuations. The model further enabled actionable insights for traders, retailers, and producers across short, medium, and long term horizons.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:Introduction}
+Coffee prices exhibit significant volatility, driven by a complex interplay of economic, environmental, and policy factors. Accurate prediction is crucial for stakeholders across the coffee value chain, requiring analysis not only of historical price trends but also of the external drivers influencing supply and demand dynamics. Modeling these dynamics allows for better anticipation of price fluctuations, thereby guiding informed decision-making in the volatile coffee market.
+
+Time-series forecasting methods are particularly relevant for this task as they can capture underlying patterns such as long-term trends and seasonal cycles inherent in commodity prices. However, the highly nonlinear and often non-stationary nature of coffee price data poses challenges for traditional linear econometric models. In recent years, machine learning (ML) and deep learning (DL) models have gained prominence due to their ability to capture complex, non-linear relationships within the data. These advanced models can uncover intricate patterns often missed by conventional methods, leading to potentially more accurate predictions in the context of financial and agricultural time series.
+
+Table \ref{tab:factors} lists several factors identified in the literature that can influence coffee prices, highlighting the multifaceted nature of the forecasting problem. 
+\begin{table*}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\caption{Factors Potentially Affecting Coffee Price}
+\label{tab:factors}
+\small
+\begin{tabular}{|p{0.3\textwidth}|p{0.3\textwidth}|p{0.3\textwidth}|}
+\hline
+\textbf{Environmental} & \textbf{Market/Economic} & \textbf{Structural/Policy} \\
+\hline
+1. Weather / Climate & 2. Seasonality / Cycles & 3. Pests \& Diseases \\
+4. Agronomic Practices & 5. Currency / Exchange Rates & 6. Global Demand / Supply \\
+7. Substitutes & 8. Speculation \& Futures Trading & 9. Market Policies \\
+10. Logistics / Supply Chain & 11. Farmer Livelihood Assets & 12. Labor Laws \\
+\hline
+\end{tabular}
+\end{table*}
+
+\subsection{Motivation}
+The primary motivation for our hybrid model stems from the complex nature of the coffee price time series, which our analysis shows is a composite of a strong, non-linear trend and multiple, overlapping long-period cycles. Applying a single, monolithic model like a standard LSTM to this raw data is a common but the model often “smooths out” the forecast, capturing the general direction but failing to reproduce the critical cyclical fluctuations that define the market’s volatility. Our divide and conquer strategy addresses this by first using MSTL to decompose the series. This allows us to isolate the dominant trend and model it with a stable Polynomial Regression, while dedicating specialized LSTM and Naive ensemble models to learning the distinct patterns of each cycle. We hypothesize that by forecasting these simpler components individually and then recombining them, the final forecast will be far more realistic, successfully capturing the sharp, periodic fluctuations that a single model would otherwise miss.
+
+\section{Literature Review}
+\label{sec:LiteratureReview}
+
+The forecasting of agricultural commodity prices, particularly coffee, involves extreme volatility, non-linearity, and susceptibility to exogenous shocks ranging from micro-climatic shifts to global trade policies. Recent literature has demonstrated a clear methodological shift from traditional econometric approaches toward sophisticated Deep Learning (DL) and hybrid architectures to address these complexities. A comprehensive summary of the reviewed literature, highlighting methodologies and identified research gaps, is presented in Table \ref{tab:lit_mapping}.
+
+\subsection{The Limitations of Traditional and Statistical Approaches}
+Historically, statistical models such as Autoregressive Integrated Moving Average (ARIMA) and Linear Regression were the standard for price forecasting. However, their reliance on assumptions of linearity and stationarity renders them largely ineffective for coffee price data, which is inherently non-stationary and chaotic. Hwase and Fofanah \cite{hwase2021coffee} compared Linear Regression against Machine Learning (ML) techniques like Extreme Gradient Boosting (XGBoost) and Long Short-Term Memory (LSTM) networks for the Ethiopian coffee market. Their findings indicated that while regression provides a baseline, it fails to capture drastic price changes, whereas XGBoost and LSTM achieved significantly lower error rates by learning non-linear patterns.
+
+Similarly, Deina et al. \cite{deina2021coffee} proposed the use of Extreme Learning Machines (ELM) as a computationally efficient alternative to traditional feed-forward networks. By preprocessing data with differencing and Partial Autocorrelation Function (PACF) filters, they demonstrated that ELM outperformed ARIMA and Exponential Smoothing in 71\% of tested scenarios across Arabica and Robusta markets. Despite these improvements, standard ML models often struggle to capture the long-term temporal dependencies required for accurate multi-step forecasting.
+
+\subsection{The Shift to Deep Learning and Sequence Modeling}
+To address the temporal limitations of standard ML, recent research has gravitated toward sequence-based Deep Learning models. Manogna et al. \cite{manogna2025deep} conducted an extensive empirical analysis of 23 agricultural commodities in India, comparing stochastic models against DL architectures including RNNs, LSTMs, and Gated Recurrent Units (GRUs). Their results conclusively showed that LSTM and GRU architectures provide superior accuracy (lowest RMSE and MAPE) by effectively utilizing gating mechanisms to retain relevant historical information over long sequences, a capability lacking in models like Support Vector Regression (SVR).
+
+However, the implementation of these models faces infrastructural and data challenges. Le et al. \cite{le2024coffee} emphasized the necessity of robust Data Warehousing and ETL (Extract, Transform, Load) processes to manage the high volume of unstructured trading data. They highlight that without a centralized repository integrating historical prices with external factors, even advanced algorithms like Facebook Prophet yield suboptimal results for informed decision-making.
+
+\begin{table*}[htbp]
+\caption{Comprehensive Literature Survey Mapping: Methodologies, Findings, and Research Gaps}
+\label{tab:lit_mapping}
+\centering
+\renewcommand{\arraystretch}{1.2} % Adjust row height
+\scriptsize % Reduce font size to fit many rows
+\begin{tabular}{|p{0.12\linewidth}|p{0.20\linewidth}|p{0.33\linewidth}|p{0.25\linewidth}|}
+\hline
+\textbf{Author (Year)} & \textbf{Methodology} & \textbf{Key Contribution / Findings} & \textbf{Identified Gap / Limitation} \\
+\hline
+Le et al.  \cite{le2024coffee} & Big Data \& AI Analytics & Emphasized the role of Data Warehousing and ETL for informed coffee trading. & Focuses on infrastructure and data management rather than specific forecasting algorithms. \\
+\hline
+Kishaija et al.  \cite{kishaija2025coffee} & Systematic Review & Analyzed impact of climate change and livelihood assets on coffee farming. & Qualitative analysis of causal factors; does not provide a quantitative forecasting model. \\
+\hline
+Hwase \& Fofanah  \cite{hwase2021coffee} & Linear Regression vs. XGBoost \& LSTM & XGBoost and LSTM significantly outperformed Linear Regression in capturing non-linear spikes. & Standard LSTM struggles with extreme volatility clusters without decomposition. \\
+\hline
+Deina et al.  \cite{deina2021coffee} & Extreme Learning Machines (ELM) & ELM outperformed ARIMA in 71\% of scenarios; highly computationally efficient. & Limited ability to capture very long-term temporal dependencies compared to Deep Learning. \\
+\hline
+Pham et al.  \cite{pham2025prophet} & Facebook Prophet & Applied additive regression models to capture seasonality in coffee prices. & Prophet often fails to capture complex, non-linear dependencies in highly volatile markets. \\
+\hline
+Manogna et al.  \cite{manogna2025deep} & Deep Learning (RNN, LSTM, GRU) & LSTM and GRU achieved lowest RMSE across 23 commodities due to gating mechanisms. & "Black-box" nature; requires large datasets to generalize effectively. \\
+\hline
+Manogna et al.  \cite{manogna2025hybrid} & Hybrid LSTM-GARCH & LSTM models the trend, GARCH explicitly models residual volatility. & Handles volatility well but treats the series as a whole without decomposing cycles. \\
+\hline
+M. K. L. V et al.  \cite{mk2023coffee} & CNN-BLSTM & Used CNN for feature extraction and BLSTM for sequence learning. & High model complexity; risk of overfitting on smaller commodity datasets. \\
+\hline
+Zhang et al.  \cite{zhang2025improving} & Image Encoding + Attention & Converted time-series to images to leverage Computer Vision (CNN + Attention). & Image conversion can lead to loss of granular temporal resolution. Increased computation.\\
+\hline
+Kambo et al.  \cite{kambo2025macpgana} & GANs \& Autoencoders & Used Generative Adversarial Networks to generate synthetic features for training. & Generative models are notoriously unstable to train (mode collapse) and computationally expensive. \\
+\hline
+Nayak et al.  \cite{nayak2025metatransformer} & Meta-Transformer (GWO/WOA) & Used metaheuristic algorithms to optimize Transformer hyperparameters. & Extreme computational overhead; difficult to implement for real-time trading systems. \\
+\hline
+\textbf{Current Work} & \textbf{MSTL + Hybrid Ensembles} & \textbf{Decomposes series into Trend, Cycles, and Residuals for specialized modeling.} & \textbf{-} \\
+\hline
+\end{tabular}
+\end{table*}
+
+\subsection{Addressing Volatility: Hybrid and Multimodal Architectures}
+A critical gap identified in the literature is that while standard LSTMs capture general trends, they often "smooth out" the extreme volatility characteristic of coffee markets. To mitigate this, recent studies in 2025 have focused on hybridizing models to treat volatility and trends separately.
+
+Manogna et al.  \cite{manogna2025hybrid} proposed a hybrid neural network approach combining LSTM with Generalized Autoregressive Conditional Heteroskedasticity (GARCH). In this framework, the LSTM models the non-linear trend, while the GARCH component explicitly models the volatility of the residuals. Parallel to this, researchers are exploring high-complexity architectures. Nayak et al. \cite{nayak2025metatransformer} introduced a "Meta-transformer" framework, utilizing metaheuristic algorithms to automatically tune Transformer hyperparameters. Other approaches include converting time-series data into images for CNNs as explored by Zhang et al.  \cite{zhang2025improving}, and Multimodal GANs as proposed by Kambo et al. \cite{kambo2025macpgana}.
+
+\subsection{Research Gap and Project Motivation}
+While the current state-of-the-art leans toward complex hybrids, there is limited research on "Divide and Conquer" strategies that explicitly decompose the time series into interpretable components (Trend, Seasonality, Residuals) before modeling. Most existing hybrids model the series as a whole or focus only on residual volatility. This project aims to implement a component-wise hybrid model (MSTL-LSTM), leveraging decomposition to allow specific models to specialize in different aspects of the coffee price signal.
+
+\section{Time Series Analysis}
+\label{sec:Preparation}
+Time series analysis is an important preliminary phase in forecasting that emphasizes the study of the temporal behavior and statistical features of successive observations. This pre-forecasting analysis not only helps in the selection of the most suitable modeling methods but also improves the final forecasts' accuracy, interpretability, and robustness. For this project all the tests were performed using python libraries available.
+
+\begin{table}[htbp]
+\centering
+\caption{Summary Statistics of Coffee Futures Data (6471 entries) from Yahoo finance (ticker: KC=F)}
+\label{tab:stock_summary}
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Statistic} & \textbf{Close} & \textbf{High} & \textbf{Low} & \textbf{Open} & \textbf{Volume} \\
+\midrule
+Count & 6471 & 6471 & 6471 & 6471 & 6471 \\
+Mean & 140.97 & 142.77 & 139.34 & 141.06 & 9415.22 \\
+Std & 67.11 & 68.02 & 66.22 & 67.05 & 10087.29 \\
+Min & 41.50 & 42.10 & 41.50 & 41.50 & 0 \\
+25\% & 102.50 & 103.75 & 101.38 & 102.50 & 58 \\
+50\% & 125.10 & 126.50 & 123.60 & 125.25 & 7513 \\
+75\% & 170.65 & 173.45 & 168.10 & 170.97 & 15577.50 \\
+Max & 438.90 & 440.85 & 424.05 & 435.40 & 62750 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Visualization}
+The closing price reflects the final consensus value of a trading day, capturing market movements and investor sentiment. It is a widely used indicator for analysis and forecasting in financial time series. The historical data is visualized in Figure \ref{fig:myimage}.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\columnwidth]{coffee_all_prices_plot.png}
+    \caption{Features of Coffee Futures vs Time (top), Volume Traded vs Time (bottom)}
+    \label{fig:myimage}
+\end{figure}
+
+\subsection{Stationarity}
+A stationary time series exhibits constant mean, variance, and autocorrelation over time, a crucial property for reliable forecasting. To rigorously assess this, we employed two complementary statistical tests.
+
+\subsubsection{Augmented Dickey-Fuller (ADF) Test}
+The ADF test checks for the presence of a unit root, which indicates non-stationarity. The null hypothesis ($H_0$) is that a unit root exists ($\gamma = 0$). The test is based on the regression:
+\begin{equation}
+\Delta y_t = \alpha + \beta t + \gamma y_{t-1} + \sum_{i=1}^{p} \delta_i \Delta y_{t-i} + \epsilon_t
+\label{eq:adf}
+\end{equation}
+where $\Delta$ is the difference operator, $\alpha$ is a constant, $\beta$ is the trend coefficient, and $p$ is the lag order chosen to minimize the Akaike Information Criterion (AIC). A highly negative test statistic ($p\text{-value} < 0.05$) rejects $H_0$, implying stationarity.
+
+\subsubsection{Kwiatkowski-Phillips-Schmidt-Shin (KPSS) Test}
+Unlike ADF, the KPSS test checks for stationarity around a deterministic trend. The null hypothesis ($H_0$) is that the series is stationary. The series is decomposed as:
+\begin{equation}
+y_t = \xi t + r_t + \epsilon_t
+\label{eq:kpss}
+\end{equation}
+where $r_t$ is a random walk ($r_t = r_{t-1} + u_t$). The test statistic assesses whether the variance of the random walk component is zero. If the statistic exceeds the critical value ($p\text{-value} < 0.05$), we reject stationarity.
+
+\begin{table}[htbp]
+\centering
+\caption{Stationarity Test Results for Closing Price}
+\label{tab:stationarity_tests}
+\renewcommand{\arraystretch}{1.1}
+\footnotesize
+\begin{tabular}{lcc}
+\toprule
+\textbf{Test} & \textbf{ADF} & \textbf{KPSS} \\
+\midrule
+Test Statistic & 0.568 & 0.722 \\
+p-value & 0.987 & $<$0.01 \\
+\midrule
+\multicolumn{3}{l}{\textbf{Critical Values}} \\
+\quad ADF 1\% & -3.431 & \\
+\quad ADF 5\% & -2.862 & \\
+\quad ADF 10\% & -2.567 & \\
+\quad KPSS 1\% & & 0.739 \\
+\quad KPSS 5\% & & 0.463 \\
+\quad KPSS 10\% & & 0.347 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The ADF test fails to reject the null hypothesis ($p > 0.05$), suggesting the series has a unit root. Conversely, the KPSS test rejects the null ($p < 0.05$), confirming non-stationarity. Both tests suggest the original closing price series is non-stationary.
+
+\subsection{Trend Seasonality Analysis}
+Identifying underlying trends (long-term movements) and seasonality (regular, periodic fluctuations) is essential for understanding time series behavior.
+
+\subsubsection{Trend Detection (Mann-Kendall Test)}
+The Mann-Kendall (M-K) test is a non-parametric method used to detect monotonic trends without assuming a linear distribution. The test statistic $S$ is calculated as:
+\begin{equation}
+S = \sum_{k=1}^{n-1} \sum_{j=k+1}^{n} \text{sgn}(x_j - x_k)
+\label{eq:mk_s}
+\end{equation}
+where $\text{sgn}(x)$ is the sign function, returning $1$ if $x > 0$, $0$ if $x=0$, and $-1$ if $x < 0$. For $n > 10$, $S$ follows a normal distribution with mean zero and variance $Var(S)$. The standardized test statistic $Z_{MK}$ determines significance:
+\begin{equation}
+Z_{MK} = \begin{cases}
+\frac{S-1}{\sqrt{Var(S)}} & \text{if } S > 0 \\
+0 & \text{if } S = 0 \\
+\frac{S+1}{\sqrt{Var(S)}} & \text{if } S < 0
+\end{cases}
+\label{eq:mk_z}
+\end{equation}
+A positive $Z_{MK}$ indicates an increasing trend.
+
+\begin{table}[htbp]
+\centering
+\caption{Mann-Kendall Trend Test Result}
+\label{tab:trend_test}
+\footnotesize
+\begin{tabular}{lc}
+\toprule
+\textbf{Test} & \textbf{Mann-Kendall} \\
+\midrule
+Normalized Stat (Z) & High positive value \\
+Kendall's tau & $\approx$ 0.51 \\
+p-value & $<$0.001 \\
+\midrule
+Interpretation & Significant Increasing Trend \\
+\bottomrule
+\end{tabular}
+\end{table}
+The Mann-Kendall test result suggests a statistically significant monotonic (likely increasing) trend in the data.
+
+\subsubsection{Seasonality Assessment}
+Seasonality refers to predictable patterns recurring at fixed intervals. Autocorrelation Function (ACF) and Partial Autocorrelation Function (PACF) plots help visualize serial correlation and potential seasonality.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\columnwidth]{ACF_PACF_Coffee_Plot.png}
+    \caption{ACF and PACF Plot for Original Closing Price Data}
+    \label{fig:origin}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\columnwidth]{diif_ACF_PACF_Coffee_Plot.png}
+    \caption{ACF and PACF Plot for First-Order Differenced Data}
+    \label{fig:diff}
+\end{figure}
+
+The ACF plot for the original data (Figure \ref{fig:origin}) shows slow decay, characteristic of non-stationary series with a strong trend. After first-order differencing, the ACF decays faster, and the PACF shows significant spikes, suggesting ARMA behavior in the differenced series. No clear, strong calendar seasonality is apparent from the plots, though longer-term cycles might exist.
+
+We tried to take a brute force approach as well to find the ideal time period for STL decomposition using a Python library. In this process, we evaluated the Ljung-Box test, seasonal strength, and trend strength for the original data, first-order differencing data, and second-order differenced data. The results indicated that the original series exhibits strong trend behavior with very weak seasonality, while differencing slightly reduced autocorrelation but did not reveal any significant seasonal patterns. The Ljung-Box test confirmed persistent autocorrelation across all forms of the series, and the seasonal strength remained close to zero, reinforcing the conclusion that cyclical or seasonal effects are minimal.
+
+Analysis using libraries like \texttt{cydets} \cite{cydets2021} identified potential cyclical periods around [143, 687, 3200] days emperically, suggesting complex cyclical patterns rather than simple seasonality.
+
+\subsubsection{Time Series Decomposition}
+Initially, standard STL decomposition was considered, but given the complex cyclical patterns identified, we moved to Multi-Seasonal Time Series Decomposition using Loess (MSTL) using the identified periods [143, 687, 3200]. The additive model is assumed:
+\begin{equation}
+Y_t = T_t + S_{t, 143} + S_{t, 687} + S_{t, 3200} + R_t
+\label{eq:mstl}
+\end{equation}
+where $Y_t$ is the observed series, $T_t$ is the trend, $S_{t,p}$ are the seasonal/cyclical components for period $p$, and $R_t$ is the residual.
+
+\begin{figure*}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{MSTL_Decomposition.png}
+    \caption{MSTL Decomposition of Original Time Series Data with Periods [143, 687, 3200]}
+    \label{fig:decomp}
+\end{figure*}
+
+The decomposition plot (Figure \ref{fig:decomp}) visually confirms the strong trend and illustrates the identified cyclical components. The residual component ($R_t$) notably displays non-constant variance (heteroscedasticity), indicating periods of higher and lower volatility, which is important for modeling.
+
+\begin{table*}[htbp]
+\centering
+\caption{MSTL Decomposition Strength Metrics}
+\label{tab:decomp_summary}
+\footnotesize
+\begin{tabular}{lc}
+\toprule
+\textbf{Metric} & \textbf{Value / Interpretation} \\
+\midrule
+Trend Strength (F\textsubscript{T}) & 0.988 -- Very Strong Trend \\
+Overall Seasonal Strength (F\textsubscript{S}) & 0.000 -- Negligible Overall Seasonality \\
+\midrule
+Strength (Period 143) & 0.836 \\
+Strength (Period 687) & 0.975 \\
+Strength (Period 3200) & 0.997 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Table \ref{tab:decomp_summary} quantitatively confirms the dominance of the trend and the strength of the identified long-term cycles, while conventional seasonality is negligible.
+
+\subsection{Achieving Stationarity}
+Various techniques were applied to transform the non-stationary series into a stationary one, often a prerequisite for models like ARIMA.
+
+\begin{table*}[htbp]
+\centering
+\caption{Stationarity Transformations and Test Results (p-values)}
+\label{tab:stationarity_transforms}
+\renewcommand{\arraystretch}{1.1}
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Technique} & \textbf{ADF p-val} & \textbf{KPSS p-val} & \textbf{Stationary?} \\
+\midrule
+Original Series & 0.987 & $<$0.01 & No \\
+\midrule
+First-order Differencing & $<$0.001 & 0.1 & Yes \\
+Second-order Differencing & $<$0.001 & 0.1 & Yes \\
+Log Transformation & 0.810 & $<$0.01 & No \\
+Square Root Transformation & 0.913 & 0.01 & No \\
+Box-Cox ($\lambda \approx 0.019$) & 0.780 & 0.01 & No \\
+Linear Detrending & 0.831 & $<$0.01 & No \\
+Moving Avg Detrend (w=30) & $<$0.001 & $>$0.1 & Yes \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Table \ref{tab:stationarity_transforms} indicates that differencing (first or second order) and moving average detrending are effective in achieving stationarity based on the ADF and KPSS tests. First-order differencing is commonly used and often sufficient.
+
+\begin{table*}[htbp]
+\centering
+\caption{Comprehensive Summary of Pre-Forecasting Diagnostic Tests for Coffee Futures Data}
+\label{tab:comprehensive_summary}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lp{2.5cm}p{2cm}p{2cm}p{5.5cm}}
+\toprule
+\textbf{Category} & \textbf{Test Name} & \textbf{Statistic} & \textbf{p-value} & \textbf{Result/Inference} \\
+\midrule
+\multirow{2}{*}{Stationarity}
+& Augmented Dickey-Fuller (ADF) & 0.568 & 0.987 & Non-stationary Data \\
+& KPSS & 0.722 & \textless0.01 & Non-stationary Data \\
+\midrule
+\multirow{2}{*}{Trend \& Seasonality}
+& Mann-Kendall Test & (Z-stat) High pos. & \textless0.001 & Significant increasing trend \\
+& ACF-PACF plots & -- & -- & No repeating patterns or significant lag in the data \\
+\midrule
+\multirow{2}{*}{Decomposition}
+& STL Decomposition & -- & -- & Failed to decompose successfully (on its own) \\
+& Classical Additive / Multiplicative & -- & -- & Failed to decompose successfully \\
+\midrule
+Autocorrelation
+& ACF/PACF Plots & -- & -- & Significant spikes but non-uniform lag \\
+\bottomrule
+\end{tabular}
+\end{table*}
+\section{Model Design and Implementation}
+\label{sec:Implementation}
+
+Based on the data characteristics identified in Section \ref{sec:Preparation}---namely the strong non-linear trend, complex multi-period cycles, and non-stationary residuals---a "divide and conquer" hybrid modeling strategy was designed.
+
+\subsection{Hybrid Model Architecture}
+The core of the design is an additive decomposition-based hybrid model, based on the MSTL decomposition in Equation \ref{eq:mstl}. Our strategy is to forecast each component on the right-hand side independently and then sum the forecasts to produce the final prediction, $\hat{Y}_t$:
+\begin{equation}
+\hat{Y}_t = \hat{T}_t + \hat{S}_{t,143} + \hat{S}_{t,687} + \hat{S}_{t,3200} + \hat{R}_t
+\label{eq:forecast}
+\end{equation}
+
+This component-wise approach allows us to use simpler, more appropriate models for each part of the series. The overall architecture of this pipeline is illustrated in Figure \ref{fig:hybrid_flowchart}.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{hybrid_model_architecture_flowchart.png}
+    \caption{Flowchart of the Custom Hybrid Model Pipeline. The raw series is decomposed, each component is forecasted by a specialized model, and the forecasts are additively recombined.}
+    \label{fig:hybrid_flowchart}
+\end{figure}
+
+\subsection{Data Preparation and Splitting}
+The \texttt{statsmodels.tsa.seasonal.MSTL} library was used to decompose the 'Close' price series using the previously identified periods [143, 687, 3200]. A critical pre-processing step involved aligning all components. After decomposition, the start and end of the series contain NaNs where the moving windows are incomplete. A \textbf{common index} was derived by finding the intersection of all non-NaN indices from the trend, all seasonal components, and the residual series. This ensures that all component data is perfectly aligned in time.
+
+This aligned dataset, with 6471 data points, was split into training and testing sets using a \textbf{90\% training ratio}. This resulted in 5823 data points for training and 648 data points for testing (the forecast horizon). This split was applied uniformly across all component series.
+
+\subsection{Component-Specific Modeling Strategies}
+A unique forecasting model was selected for each of the five components, as detailed below:
+
+\vspace{0.5em}
+
+\noindent\textbf{Trend ($T_t$)} \\
+\textbf{Model:} Polynomial Regression (Degree 2). \\
+\textbf{Implementation:} A \texttt{sklearn} pipeline combining \texttt{PolynomialFeatures(degree=2)} and \texttt{LinearRegression} was fit on the training data, creating a model of the form:
+\begin{equation}
+\hat{T}_t = \beta_0 + \beta_1 t + \beta_2 t^2
+\label{eq:poly}
+\end{equation}
+where $t$ is the time index. \\
+\textbf{Rationale:} The trend is smooth and non-linear. A quadratic polynomial provides a stable and non-overfit extrapolation for the long-term curve.
+
+\vspace{0.5em}
+
+\noindent\textbf{Seasonal 143-day ($S_{t,143}$)} \\
+\textbf{Model:} 50/50 Weighted Ensemble (Naive + LSTM). \\
+\textbf{Implementation:}
+\begin{itemize}
+    \item \textbf{Naive Forecast:} Repeats the last 143-day cycle from the training set.
+    \item \textbf{LSTM Forecast:} A 'simple' 1-layer LSTM (50 units) trained on the component.
+\end{itemize}
+\textbf{Rationale:} This ensemble blends the stability of a simple seasonal naive forecast (which assumes the cycle repeats) with a simple LSTM's ability to learn and adapt to recent deviations in the cycle's pattern.
+
+\vspace{0.5em}
+
+\noindent\textbf{Seasonal 687-day ($S_{t,687}$)} \\
+\textbf{Model:} 50/50 Weighted Ensemble (Naive + LSTM). \\
+\textbf{Implementation:}
+\begin{itemize}
+    \item \textbf{Naive Forecast:} Repeats the last 687-day cycle from the training set.
+    \item \textbf{LSTM Forecast:} A 'default' 2-layer LSTM (64, 32 units).
+\end{itemize}
+\textbf{Rationale:} The same ensemble logic is applied to this stronger, medium-term cycle, but with a more robust 'default' LSTM architecture to capture its more complex dynamics.
+
+\vspace{0.5em}
+
+\noindent\textbf{Seasonal 3200-day ($S_{t,3200}$)} \\
+\textbf{Model:} LSTM Only. \\
+\textbf{Implementation:} A 'complex' 2-layer LSTM (128, 128 units) with 50\% Dropout. \\
+\textbf{Rationale:} This cycle is extremely long (over 8 years), making a naive forecast impractical as it would require 8 years of data just to get one cycle. A dedicated, deep LSTM is used to model this very long-term dynamic behavior.
+
+\vspace{0.5em}
+
+\noindent\textbf{Residual ($R_t$)} \\
+\textbf{Model:} LSTM Only. \\
+\textbf{Implementation:} A 'default' 2-layer LSTM (64, 32 units). \\
+\textbf{Rationale:} The residual component contains the high-frequency noise and non-linear patterns (like volatility clusters) not captured by the trend or cycles. An LSTM is well-suited to model these complex, non-linear, and seemingly random short-term movements.
+
+\subsection{LSTM Implementation Details}
+All LSTM models were built using \texttt{tensorFlow.Keras}.
+\begin{itemize}
+    \item \textbf{Scaling:} To prevent data leakage, a \texttt{StandardScaler} was fit \textit{only} on the training data for each component. This scaler was then used to transform both the train and test sets for that component.
+    \item \textbf{Sequencing:} A lookback window (\texttt{TIME\_STEP}) of \textbf{60 days} was used. The models were trained to predict the 61st day based on the previous 60 days.
+    \item \textbf{Training:} All models were trained for \textbf{30 epochs} with a \textbf{batch size of 32}.
+    \item \textbf{Optimizer \& Loss:} The \textbf{Adam} optimizer was used, and the models were optimized to minimize \textbf{Mean Absolute Error (MAE)}, which is robust to outliers.
+\end{itemize}
+
+The specific LSTM architectures used for the different components are summarized in Table \ref{tab:lstm_architectures} and visualized in Figure \ref{fig:lstm_architectures}.
+
+\begin{table}[htbp]
+\centering
+\caption{LSTM Model Architectures for Components}
+\label{tab:lstm_architectures}
+\footnotesize
+\begin{tabular}{l l l}
+\toprule
+\textbf{Component} & \textbf{Config} & \textbf{Layers \& Units} \\
+\midrule
+$S_{t, 143}$ & Simple & L1: LSTM (50 units) \\
+\midrule
+$S_{t, 687}, R_t$ & Default & L1: LSTM (64 units) \\
+ & & L2: LSTM (32 units) \\
+\midrule
+$S_{t, 3200}$ & Complex & L1: LSTM (128 units) \\
+ & & L2: LSTM (128 units) \\
+ & & L3: Dropout (0.5) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure*}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{lstm_architectures_diagram.png}
+    \caption{Visual comparison of the three custom LSTM architectures ('simple', 'default'/'residual', and 'complex') designed to handle components of varying complexity.}
+    \label{fig:lstm_architectures}
+\end{figure*}
+
+
+\subsection{Experimental Setup and Hyperparameters}
+To ensure reproducibility and fair comparison, a consistent experimental setup was maintained across all models (slightly extended data than Time series analysis). The dataset was split chronologically with a 90\% training and 10\% testing ratio to respect temporal order. All Deep Learning models were trained using the Adam optimizer with a learning rate of 0.001, optimizing for Mean Absolute Error (MAE) to reduce sensitivity to outliers.
+
+\begin{table}[htbp]
+\centering
+\caption{Global Hyperparameters & Model Configurations}
+\label{tab:hyperparameters}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|l|p{0.6\linewidth}|}
+\hline
+\textbf{Parameter} & \textbf{Value / Configuration} \\
+\hline
+Training / Test Split & 90\% (5833 samples) / 10\% (649 samples) \\
+\hline
+Lookback Window & 60 Days \\
+\hline
+Optimizer & Adam ($\alpha=0.001$) \\
+\hline
+Loss Function & Mean Absolute Error (MAE) \\
+\hline
+Batch Size & 32 \\
+\hline
+Epochs & 30 \\
+\hline
+\hline
+\multicolumn{2}{|c|}{\textbf{Benchmark Model Configurations}} \\
+\hline
+Trend-Adj. Naive & Trend: Polynomial Regression (Deg 2) \newline Seasonality: Naive Repetition (Last Cycle) \\
+\hline
+ARIMA & Order $(p,d,q) = (5, 1, 0)$ \newline \textit{Selected based on PACF plots showing lag persistence.} \\
+\hline
+ELM & Hidden Neurons: 25 \newline Activation: Sigmoid \newline \textit{Config based on best Arabica results from Deina et al. [2].} \\
+\hline
+Complex LSTM & Layers: 128 (RetSeq) $\rightarrow$ 128 $\rightarrow$ Dense 128 (ReLU) $\rightarrow$ Dropout (0.5) $\rightarrow$ Dense 1 \newline \textit{Identical architecture to the $S_{3200}$ component to test monolithic performance.} \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Benchmark Selection Rationale}
+The benchmarks were specifically chosen to test the validity of the decomposition strategy:
+\begin{itemize}
+    \item \textbf{Trend-Adjusted Seasonal Naive:} Establishes a baseline for identifying whether the market dynamics are simply historical repetitions or require actual learning. By using Polynomial Regression for the trend (matching our proposed model), we isolate the evaluation to the cyclical forecasting capability.
+    \item \textbf{ARIMA (5,1,0):} Represents standard linear stochastic modeling. Failure here confirms the non-linear, chaotic nature of the data.
+    \item \textbf{Complex Monolithic LSTM:} Uses the exact same deep architecture (128 units, Dropout) as our most complex component ($S_{3200}$). This serves as an ablation study: if the Hybrid model outperforms this Monolithic version, it proves that MSTL decomposition contributes significantly to accuracy, rather than the neural network depth alone.
+\end{itemize}
+
+\section{Results and Evaluation}
+\label{sec:Results}
+
+The forecasts from the five individual component models were additively recombined to create the final hybrid forecast (see Equation \ref{eq:forecast}). This final forecast was then evaluated against the held-out test set to assess the model's performance.
+
+The model's performance was evaluated using three standard metrics: Root Mean Squared Error (RMSE), Mean Absolute Error (MAE), and Mean Absolute Percentage Error (MAPE). These metrics are defined as:
+
+\begin{equation}
+  \text{RMSE} = \sqrt{\frac{1}{n} \sum_{t=1}^{n} (y_t - \hat{y}_t)^2}
+  \label{eq:rmse}
+\end{equation}
+
+\begin{equation}
+  \text{MAE} = \frac{1}{n} \sum_{t=1}^{n} |y_t - \hat{y}_t|
+  \label{eq:mae}
+\end{equation}
+
+\begin{equation}
+  \text{MAPE} = \frac{100\%}{n} \sum_{t=1}^{n} \left| \frac{y_t - \hat{y}_t}{y_t} \right|
+  \label{eq:mape}
+\end{equation}
+
+\noindent where $n$ is the number of test points (648), $y_t$ is the actual value, and $\hat{y}_t$ is the forecasted value.
+
+\subsection{Model Performance Metrics}
+The model achieved the following performance on the test set. The final evaluation metrics are presented in Table \ref{tab:final_metrics}.
+\begin{table}[htbp]
+\centering
+\caption{Final Custom Hybrid Model Performance Metrics}
+\label{tab:final_metrics}
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{lr}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+RMSE  & 10.5378 \\
+MAE  & 7.9016 \\
+MAPE  & 2.89\% \\
+\bottomrule
+\multicolumn{2}{l}{\footnotesize Metrics calculated on 649 test data points.}
+\end{tabular}
+\end{table}
+
+\subsection{Forecast Visualization}
+A visual inspection of the forecast versus the actual prices provides a qualitative assessment of the model's performance. Figure \ref{fig:final_forecast_plot} plots the actual 'Close' price (black line) against the model's one-step-ahead forecast (red dashed line) over the entire test period.
+
+The plot shows that the custom hybrid model tracks the complex movements of the coffee price, capturing the major peaks and troughs, including the sharp rise, the subsequent correction, and the final rally. 
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{model.jpg}
+    \caption{Final Custom Hybrid Forecast vs. Actual Close Price on the test set. The model (red dashed line) is shown against the actual price (black line), achieving an RMSE of 10.54.}
+    \label{fig:final_forecast_plot}
+\end{figure}
+
+\subsection{Comparative Analysis and Benchmarking}
+To validate the efficacy of our proposed framework, we benchmarked our performance against established methodologies. To establish a rigorous lower bound, we utilized a \textbf{Trend-Adjusted Seasonal Naive} model. This model isolates the trend component (using the same Polynomial Regression strategy as our proposed model) and combines it with seasonal naive forecasts for the cyclical components. 
+
+We further compared our results against a traditional statistical baseline (\textbf{ARIMA}), a shallow learning model (\textbf{ELM}), and a monolithic Deep Learning model (\textbf{Complex LSTM}). The "Complex LSTM" uses the exact same architecture as our $S_{3200}$ component (128 units, 2 layers, Dropout) but is trained on the non-decomposed raw data. This serves as an ablation study to test whether the MSTL decomposition is adding value beyond the power of the LSTM itself.
+
+\begin{table}[htbp]
+\centering
+\caption{Benchmark Comparison against Standard Models}
+\label{tab:benchmark}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Model} & \textbf{RMSE} & \textbf{MAE} & \textbf{MAPE (\%)} \\
+\midrule
+Trend-Adj. Seasonal Naive & 79.53 & 71.07 & 29.03\% \\
+ARIMA (5,1,0) & 106.77 & 79.68 & 25.90\% \\
+Extreme Learning Machine (ELM) & 36.61 & 23.42 & 7.12\% \\
+Complex Monolithic LSTM & 13.85 & 9.91 & 3.25\% \\
+\midrule
+\textbf{Proposed MSTL-LSTM} & \textbf{10.54} & \textbf{7.90} & \textbf{2.89\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The poor performance of the Trend-Adjusted Seasonal Naive model (RMSE 79.53) confirms that the coffee market exhibits complex dynamics that cannot be captured by simple trend extrapolation and historical repetition. Similarly, the ARIMA model failed to capture the non-linear volatility. 
+
+Crucially, while the Complex Monolithic LSTM achieved a competitive RMSE of 13.85, a qualitative inspection reveals significant limitations regarding trend coherence and signal smoothness. Monolithic models trained on raw, volatile data often resort to 'persistence behavior,' smoothing out the output and mirroring the previous time step rather than learning the underlying trajectory. This results in an artificially smooth forecast that reacts to noise rather than anticipating structural shifts. In contrast, by explicitly modeling the low-frequency trend component via Polynomial Regression and high-frequency volatility via residuals, the proposed MSTL-LSTM framework produces a highly responsive forecast. The resulting 'volatile' curve (Figure 7) is not noise, but rather an accurate reflection of the market's true behavior, capturing sharp reversals that the smoothed monolithic model misses. This structural robustness is confirmed by the superior error metrics (RMSE 10.54 vs 13.85).
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{comparision.jpg}
+    \caption{Benchmark Comparison: The Trend-Adjusted Seasonal Naive and ARIMA models fail to track volatility. The proposed Hybrid model outperforms the monolithic Complex LSTM in both precision and trend tracking.}
+    \label{fig:benchmark_plot}
+\end{figure}
+
+\section{Stakeholder Insights}
+\label{sec:Insights}
+
+A forecast's primary value lies in its ability to inform decision-making. The developed model's predictions were analyzed to provide actionable insights for three key stakeholder groups. This is achieved by generating a long-term (90-day) forecast and then analyzing segments of this forecast to provide advice tailored to different time horizons.
+
+\subsection{Analysis Methodology}
+To provide relevant advice, the model's 90-day forecast is segmented into three distinct time horizons: Short-Term (1-7 days), Medium-Term (30 days), and Long-Term (90 days). Each horizon is analyzed using advanced metrics:
+
+\vspace{0.5em}
+
+\noindent\textbf{Momentum (Trend):} A linear regression line ($\hat{y} = mt + c$) is fitted to the forecast for each horizon. The slope ($m$) determines the momentum. A positive $m > 0.1$ is considered an 'Upward' trend, $m < -0.1$ 'Downward', and 'Stable' otherwise.
+
+\vspace{0.5em}
+
+\noindent\textbf{Volatility:} The standard deviation of the forecast ($\sigma_{f}$) is compared to the standard deviation of the last 90 days of historical data ($\sigma_{h}$). Volatility is flagged as 'High' if $\sigma_{f} > 1.5 \times \sigma_{h}$ or 'Low' if $\sigma_{f} < 0.75 \times \sigma_{h}$.
+
+\vspace{0.5em}
+
+\noindent\textbf{Key Levels:} The maximum (Peak) and minimum (Trough) price within the forecast horizon are identified to establish a predicted trading range.
+
+This multi-faceted analysis forms the basis for the stakeholder-specific recommendations presented in Table \ref{tab:stakeholder_insights}.
+
+
+\begin{table}[H]
+\centering
+\caption{Stakeholder Recommendations Based on Forecast Analysis}
+\label{tab:stakeholder_insights}
+\renewcommand{\arraystretch}{1.3}
+\small
+\begin{tabularx}{\textwidth}{l|l|X}
+\toprule
+\textbf{Stakeholder} & \textbf{Time Horizon} & \textbf{Analysis \& Recommendation} \\
+\midrule
+\textbf{Investor / Trader} & \textbf{Short-Term (1-7 Days)} &
+    \textbf{If Trend is Upward:} Consider short-term long positions. High volatility warrants wider stops, while low volatility may signal a breakout. \newline
+    \textbf{If Trend is Downward:} Consider short-term short positions or put options. High volatility in a downtrend is particularly risky. \newline
+    \textbf{If Trend is Stable:} Consider range-trading strategies or options-selling (e.g., iron condors) to profit from low volatility. \\
+\midrule
+\textbf{Retailer / Buyer} & \textbf{Medium-Term (30 Days)} &
+    \textbf{If Trend is Upward:} \emph{Action: Secure Inventory.} Consider buying in bulk now or locking in fixed-price contracts to protect margins. \newline
+    \textbf{If Trend is Downward:} \emph{Action: Delay Purchases.} Operate on a Just-In-Time (JIT) basis to capitalize on falling prices. Use forecast to negotiate. \newline
+    \textbf{If Trend is Stable:} \emph{Action: Maintain Normal Operations.} Continue standard purchasing cycles. Focus on quality and efficiency. \\
+\midrule
+\textbf{Producer / Farmer} & \textbf{Long-Term (90 Days)} &
+    \textbf{If Trend is Upward:} \emph{Action: Hold Inventory.} If financially possible, delay sales to target the forecasted peak price. Avoid locking in low-priced contracts. \newline
+    \textbf{If Trend is Downward:} \emph{Action: Sell Inventory.} A strong signal to sell current inventory. Aggressively seek forward contracts for future harvests. \newline
+    \textbf{If Trend is Stable:} \emph{Action: Secure Partners.} Focus on building long-term relationships and contracts with reliable buyers. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Conclusion}
+\label{sec:Conclusion}
+
+This project developed a hybrid, decomposition-based model to forecast volatile coffee futures prices. By applying a divide and conquer strategy, we decomposed the complex, non-stationary time series into five simpler components: a long-term trend, three distinct cycles, and a high-frequency residual.
+
+We then applied forecast models to each component, using Polynomial Regression for the smooth trend, Naive-LSTM ensembles for the shorter cycles, and dedicated LSTMs for the long-term cycle and the residual. This component-wise approach respects the unique statistical properties of each part of the series.
+
+The final recombined forecast achieved a \textbf{MAPE of 2.89\%} and an \textbf{RMSE of 10.54} on the 648-day test set. As shown in Figure \ref{fig:final_forecast_plot}, the model's forecast tracks the actual price movements, capturing the general direction of major peaks and troughs. This decompositional method provides a structured framework for modeling such a complex time series.
+
+\nocite{*}
+\bibliographystyle{IEEEtran}
+\bibliography{article}
+
+\end{document}
