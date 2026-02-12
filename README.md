@@ -92,6 +92,9 @@ Coffee-Price-Forecasting/
 │   - Evidence supporting results in the article
 │
 └── README.md
+└── procedure.txt
+└── requirements.txt
+
 ```
 
 ---
