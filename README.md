@@ -79,14 +79,15 @@ Coffee-Price-Forecasting
 │
 ├── Latex/                 # LaTeX source files and generated figures
 │
-├── Results/               # Experiments, notebooks, and output files
+├── Result/
+│   Contains experimental outputs:
+│   - Model performance metrics
+│   - Model comparison results
+│   - Seasonality and trend strength analysis
+│   - Evidence supporting results in the article
 │
-├── README.md              # Project documentation
-└── requirements.txt       # Python dependencies
-
+└── README.md
 ```
-
-
 
 ---
 
