@@ -67,32 +67,26 @@ Test data size: **648 samples**
 ## 📂 Project Structure
 
 ```
-Coffee-Price-Forecasting/
+Coffee-Price-Forecasting
 │
-├── Code/
-│   Contains all scripts used for:
-│   - Data preprocessing
-│   - Model training
-│   - Forecasting
-│   - Benchmark comparisons
+├── Code/                  # Core source code
+│   ├── pages/             # App pages and trained models
+│   ├── utils/             # Helper modules (training, prediction, plots, analysis)
+│   ├── datasets/          # CSV and data files
+│   └── app.py             # Main application entry point
 │
-├── Documents/
-│   - Final project report
-│   - Presentation slides
+├── Documents/             # Project report and presentation
 │
-├── Latex/
-│   - Source files used to generate the article
-│   - Overleaf-compatible project files
+├── Latex/                 # LaTeX source files and generated figures
 │
-├── Result/
-│   Contains experimental outputs:
-│   - Model performance metrics
-│   - Model comparison results
-│   - Seasonality and trend strength analysis
-│   - Evidence supporting results in the article
+├── Results/               # Experiments, notebooks, and output files
 │
-└── README.md
+├── README.md              # Project documentation
+└── requirements.txt       # Python dependencies
+
 ```
+
+
 
 ---
 
@@ -187,7 +181,7 @@ The hybrid model is compared with:
 ## 👨‍💻 Authors
 
 * Adarsh S. Kamatagi – 23BCS005
-* Rohan Babhale Laxmikant – 23BCS026
+* Babhale Rohan Laxmikant – 23BCS026
 
 Course: **Statistics for Computer Science (CS309)**
 
